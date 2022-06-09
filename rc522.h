@@ -15,7 +15,7 @@ extern "C" {
 #define RC522_DEFAULT_TACK_STACK_SIZE      (4 * 1024)
 #define RC522_DEFAULT_TACK_STACK_PRIORITY  (4)
 
-typedef void(*rc522_tag_callback_t)(uint8_t*);
+typedef void(*rc522_tag_callback_t)(uint8_t* , uint8_t);
 
 typedef struct {
     int miso_io;                    /*<! MFRC522 MISO gpio (Default: 25) */
@@ -29,8 +29,6 @@ typedef struct {
     uint8_t task_priority;          /*<! Priority of rc522 task (Default: 4) */
 } rc522_config_t;
 
-typedef rc522_config_t rc522_start_args_t;
-
 /**
  * @brief Initialize RC522 module.
  *        To start scanning tags - call rc522_resume or rc522_start2 function.
@@ -38,13 +36,6 @@ typedef rc522_config_t rc522_start_args_t;
  * @return ESP_OK on success
  */
 esp_err_t rc522_init(rc522_config_t* config);
-
-/**
- * @brief Convert serial number (array of 5 bytes) to uint64_t number
- * @param sn Serial number
- * @return Serial number in number representation. If fail, 0 will be retured
- */
-uint64_t rc522_sn_to_u64(uint8_t* sn);
 
 /**
  * @brief Check if RC522 is inited
@@ -59,7 +50,7 @@ bool rc522_is_inited();
  * @param start_args Configuration
  * @return ESP_OK on success
  */
-esp_err_t rc522_start(rc522_start_args_t start_args);
+esp_err_t rc522_start(rc522_config_t start_args);
 
 /**
  * @brief Start to scan tags. If already started, ESP_OK will just be returned.
@@ -86,6 +77,9 @@ esp_err_t rc522_pause();
  * @brief Destroy RC522 and free all resources
  */
 void rc522_destroy();
+
+esp_err_t rc522_buffer_to_str(uint8_t *buffer, uint8_t buffer_len, char *str_buffer, uint8_t str_len);
+
 
 #ifdef __cplusplus
 }
