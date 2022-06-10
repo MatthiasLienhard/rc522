@@ -26,8 +26,7 @@ struct rc522
     uint8_t uid_len;
 };
 
-
-static struct rc522* rfid_reader = NULL;
+static struct rc522 *rfid_reader = NULL;
 
 #define rc522_fw_version() rc522_read(0x37)
 
@@ -55,34 +54,38 @@ static esp_err_t rc522_spi_init()
         .mode = 0,
         .spics_io_num = rfid_reader->config->cs_io,
         .queue_size = 7,
-        .address_bits=8};
+        .address_bits = 8};
 
     ESP_LOGD(TAG, "initializing SPI device");
 
     return spi_bus_add_device(rfid_reader->config->spi_host_id, &devcfg, &rfid_reader->spi);
-
 }
 
 static esp_err_t rc522_write_n(uint8_t addr, uint8_t n, uint8_t *data)
 {
-    
+
     spi_transaction_t t = {};
-    uint8_t *buffer=NULL;
+    uint8_t *buffer = NULL;
     t.length = 8 * n;
-    t.addr=((addr << 1) & 0x7E);
-	if (n <= 4) {
+    t.addr = ((addr << 1) & 0x7E);
+    if (n <= 4)
+    {
         t.flags = SPI_TRANS_USE_TXDATA;
-        for (uint8_t i=0;i<n;i++){
-            t.tx_data[i]=data[i];
+        for (uint8_t i = 0; i < n; i++)
+        {
+            t.tx_data[i] = data[i];
         }
-	} else {
-        buffer = (uint8_t *) heap_caps_malloc(n, MALLOC_CAP_DMA);
+    }
+    else
+    {
+        buffer = (uint8_t *)heap_caps_malloc(n, MALLOC_CAP_DMA);
         memcpy(buffer, data, n);
-		t.tx_buffer = buffer;
-	}	
+        t.tx_buffer = buffer;
+    }
 
     esp_err_t ret = spi_device_transmit(rfid_reader->spi, &t);
-    if (buffer){
+    if (buffer)
+    {
         free(buffer);
     }
 
@@ -96,10 +99,10 @@ static esp_err_t rc522_write(uint8_t addr, uint8_t val)
 
 static uint8_t rc522_read(uint8_t addr)
 {
-    spi_transaction_t t={};
+    spi_transaction_t t = {};
     t.flags = SPI_TRANS_USE_RXDATA;
     t.length = 8;
-    t.addr=((addr << 1) & 0x7E) | 0x80;
+    t.addr = ((addr << 1) & 0x7E) | 0x80;
     spi_device_transmit(rfid_reader->spi, &t);
     return t.rx_data[0];
 }
@@ -117,7 +120,7 @@ static esp_err_t rc522_clear_bitmask(uint8_t addr, uint8_t mask)
 static esp_err_t rc522_antenna_on()
 {
     return rc522_set_bitmask(0x14, 0x03);
-    //return rc522_write(0x26, 0x60); // 43dB gain
+    // return rc522_write(0x26, 0x60); // 43dB gain
 }
 
 static esp_err_t rc522_antenna_off()
@@ -167,19 +170,20 @@ esp_err_t rc522_init(rc522_config_t *config)
         rc522_destroy();
         return err;
     }
-    
 
     // ---------- RW test ------------
     const uint8_t test_addr = 0x24, test_val = 0x25;
     for (uint8_t i = test_val; i < test_val + 2; i++)
     {
-        ESP_LOGD(TAG, "RW test %#x",i);
+        ESP_LOGD(TAG, "RW test %#x", i);
         if ((err = rc522_write(test_addr, i)) != ESP_OK)
         {
             ESP_LOGE(TAG, "RW test fail: write");
             rc522_destroy();
             return err;
-        }else if (rc522_read(test_addr) != i){
+        }
+        else if (rc522_read(test_addr) != i)
+        {
             ESP_LOGE(TAG, "RW test fail: read %#x", rc522_read(test_addr));
             rc522_destroy();
             return err;
@@ -195,7 +199,6 @@ esp_err_t rc522_init(rc522_config_t *config)
     rc522_write(0x2C, 0x00); // timer reload (higer)
     rc522_write(0x15, 0x40); // transmit modulation (forces a 100 % ASK modulation independent of the ModGsPReg register setting)
     rc522_write(0x11, 0x3D); // general transmitting and receiving modes: default but CRC preset to 0x6363
-
 
     rfid_reader->running = true;
     if (xTaskCreate(rc522_task, "rc522_task", rfid_reader->config->task_stack_size, NULL, rfid_reader->config->task_priority, &rfid_reader->task_handle) != pdTRUE)
@@ -259,7 +262,7 @@ static esp_err_t rc522_calculate_crc(uint8_t *data, uint8_t n, uint8_t *res)
 
 static esp_err_t rc522_communicate(uint8_t cmd, uint8_t *send_data, uint8_t send_n, uint8_t *res_data, uint8_t *res_n)
 {
-    
+
     ESP_LOGD(TAG, "communication %#x, data:", cmd);
     ESP_LOG_BUFFER_HEX_LEVEL(TAG, send_data, send_n, ESP_LOG_DEBUG);
     uint8_t irq = 0x00;
@@ -307,7 +310,6 @@ static esp_err_t rc522_communicate(uint8_t cmd, uint8_t *send_data, uint8_t send
             ESP_LOGD(TAG, "Timeout irq");
             return ESP_ERR_TIMEOUT;
         }
-        
     }
     if (i == 0)
     {
@@ -344,7 +346,7 @@ static esp_err_t rc522_communicate(uint8_t cmd, uint8_t *send_data, uint8_t send
         }
         *res_n = nn;
     }
-    ESP_LOGD(TAG, "return %i bytes of data:",*res_n);
+    ESP_LOGD(TAG, "return %i bytes of data:", *res_n);
     ESP_LOG_BUFFER_HEX_LEVEL(TAG, res_data, *res_n, ESP_LOG_DEBUG);
     return ESP_OK;
 }
@@ -357,7 +359,7 @@ static esp_err_t rc522_request()
     uint8_t buffer[2];
     uint8_t buffer_len = 2;
     esp_err_t state = rc522_communicate(0x0C, &req_mode, 1, buffer, &buffer_len);
-    ESP_LOGD(TAG, "reqA returned %#x:%#x",buffer[0], buffer[1]);
+    ESP_LOGD(TAG, "reqA returned %#x:%#x", buffer[0], buffer[1]);
     return state;
 }
 
@@ -389,7 +391,7 @@ static esp_err_t rc522_halt()
 
 static esp_err_t rc522_get_tag()
 {
-    
+
     uint8_t buffer[9];
     uint8_t res_n;
     uint8_t uid_len = 0;
@@ -467,19 +469,20 @@ static esp_err_t rc522_get_tag()
                 }
             }
         } // else ? reqA, but no uid read... count errors?
-    }else if (rfid_reader->uid_len > 0)
+    }
+    else if (rfid_reader->uid_len > 0)
     {
         // add card gone callback?
         ESP_LOGD(TAG, "Card Gone");
         rc522_handler_t cb = rfid_reader->config->callback;
-        if (cb){
+        if (cb)
+        {
             cb(rfid_reader->uid, rfid_reader->uid_len, true);
         }
         rfid_reader->uid_len = 0;
     }
     return state;
 }
-
 
 esp_err_t rc522_start()
 {
@@ -517,7 +520,7 @@ void rc522_destroy()
         return;
     }
 
-    rc522_pause();         // stop timer
+    rc522_pause();                // stop timer
     rfid_reader->running = false; // task will delete itself
 
     if (rfid_reader->spi)
