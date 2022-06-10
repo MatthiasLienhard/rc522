@@ -100,7 +100,7 @@ static uint8_t rc522_read(uint8_t addr)
     t.flags = SPI_TRANS_USE_RXDATA;
     t.length = 8;
     t.addr=((addr << 1) & 0x7E) | 0x80;
-    assert(spi_device_transmit(rfid_reader->spi, &t)==ESP_OK);
+    spi_device_transmit(rfid_reader->spi, &t);
     return t.rx_data[0];
 }
 
@@ -116,31 +116,13 @@ static esp_err_t rc522_clear_bitmask(uint8_t addr, uint8_t mask)
 
 static esp_err_t rc522_antenna_on()
 {
-    esp_err_t ret;
-
-    if (~(rc522_read(0x14) & 0x03))
-    {
-        ret = rc522_set_bitmask(0x14, 0x03);
-
-        if (ret != ESP_OK)
-        {
-            return ret;
-        }
-    }
-    //return ESP_OK;
-    return rc522_write(0x26, 0x60); // 43dB gain
+    return rc522_set_bitmask(0x14, 0x03);
+    //return rc522_write(0x26, 0x60); // 43dB gain
 }
 
 static esp_err_t rc522_antenna_off()
 {
-    esp_err_t ret;
-
-    if (rc522_read(0x14) & 0x03)
-    {
-        ret = rc522_clear_bitmask(0x14, 0x03);
-        return ret;
-    }
-    return ESP_ERR_INVALID_ARG;
+    return rc522_clear_bitmask(0x14, 0x03);
 }
 
 static void rc522_task(void *arg);
@@ -171,7 +153,7 @@ esp_err_t rc522_init(rc522_config_t *config)
     rfid_reader->uid_len = 0;
     // copy config considering defaults
     rfid_reader->config->callback = config->callback;
-    rfid_reader->config->spi_speed_hz = config->spi_speed_hz == 0 ? RC522_DEFAULT_CLK_SPEED : config->cs_io;
+    rfid_reader->config->spi_speed_hz = config->spi_speed_hz == 0 ? RC522_DEFAULT_CLK_SPEED : config->spi_speed_hz;
     rfid_reader->config->cs_io = config->cs_io == 0 ? RC522_DEFAULT_CS : config->cs_io;
     rfid_reader->config->spi_host_id = config->spi_host_id == 0 ? RC522_DEFAULT_SPI_HOST : config->spi_host_id;
     rfid_reader->config->scan_interval_ms = config->scan_interval_ms < 50 ? RC522_DEFAULT_SCAN_INTERVAL_MS : config->scan_interval_ms;
@@ -225,7 +207,7 @@ esp_err_t rc522_init(rc522_config_t *config)
 
     if (err != ESP_OK)
     {
-        ESP_LOGE(TAG, "Fail to create timer");
+        ESP_LOGE(TAG, "Failed to create timer");
         rc522_destroy();
         return err;
     }
